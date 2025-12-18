@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Spray Timing Advisor</title>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0 20px; }
+    #map { height: 300px; margin-bottom: 10px; }
+    .plots { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 10px; }
+    .plot { border: 1px solid #ccc; border-radius: 8px; padding: 6px; max-width: 250px; }
+    .spray-table { width: 100%; margin-top: 15px; border-collapse: collapse; }
+    .spray-table th, .spray-table td { border: 1px solid #ccc; padding: 4px; font-size: 12px; text-align: center; }
+    .green-row { background-color: #d4edda; }
+    .red-row { background-color: #f8d7da; }
+    footer { text-align: center; margin: 30px 0 10px; color: gray; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h2>Spray Timing Advisor</h2>
+  <div id="map"></div>
+
+  <div class="plots">
+    <img id="tempPlot" class="plot" />
+    <img id="windPlot" class="plot" />
+    <img id="precipPlot" class="plot" />
+    <img id="windRosePlot" class="plot" />
+  </div>
+
+  <h3>Best Spray Times</h3>
+  <table class="spray-table" id="sprayTable">
+    <thead>
+      <tr><th>Day</th><th>Date</th><th>Time</th><th>Wind Speed (m/s)</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <footer>Developed By Ali Bazrafkan || 7017299088</footer>
+
+  <script>
+    const map = L.map("map").setView([45, -100], 4);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+    let marker = null;
+
+    function updatePlots(data) {
+      document.getElementById("tempPlot").src = `data:image/png;base64,${btoa(data.temperature_plot)}`;
+      document.getElementById("windPlot").src = `data:image/png;base64,${btoa(data.wind_plot)}`;
+      document.getElementById("precipPlot").src = `data:image/png;base64,${btoa(data.precipitation_plot)}`;
+      document.getElementById("windRosePlot").src = `data:image/png;base64,${btoa(data.wind_rose_plot)}`;
+    }
+
+    function updateSprayTable(data) {
+      const tbody = document.querySelector("#sprayTable tbody");
+      tbody.innerHTML = "";
+      [...data.today, ...data.week].forEach(row => {
+        const tr = document.createElement("tr");
+        tr.className = row.color === "#d4edda" ? "green-row" : "red-row";
+        tr.innerHTML = `<td>${row.day}</td><td>${row.date}</td><td>${row.time}</td><td>${row.wind_speed}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    map.on("click", function(e) {
+      const lat = e.latlng.lat;
+      const lon = e.latlng.lng;
+
+      if (marker) map.removeLayer(marker);
+      marker = L.marker([lat, lon]).addTo(map);
+
+      fetch("/get_weather_data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: lat, lon: lon })
+      })
+      .then(res => res.json())
+      .then(data => {
+        updatePlots(data);
+        updateSprayTable(data.spray_times);
+      });
+    });
+  </script>
+</body>
+</html>
